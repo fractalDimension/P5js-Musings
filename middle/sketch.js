@@ -1,30 +1,36 @@
 // TODO allow for the use of es6
 
 // how many rows board is subdivided into (MUST BE EVEN)
-var row_number = 10;
+var row_number = 16;
 // number of lines
-var difficulty = 3;
+var difficulty = 5;
+// min moves to win
+var shuffle_amount = 3;
+var max_start_height = 3;
+var min_start_height = 1;
 
 // line dimension an spacing
-var line_width = 0.1;
-var line_height = 0.02;
-var line_gap = 0.05;
+var line_width_ratio = 0.1;
+var line_height_ratio = 0.04;
+var line_gap_ratio = 0.05;
 
 // instantiate a global state controller object (theres probably a better way to do it)
  var stateContr = new SelectedStateController();
+
 // array for the line objects
  var middle_lines = [];
 
+// NOTE: variables in setup are not global scope 
 function setup() {
 
    // Create the canvas
-  createCanvas(400, 200);
+  createCanvas(600, 400);
+
+  // color parameters
+  colorMode(RGB, 255);
 
   // stop from looping thru draw()
   noLoop();
-  
-  // Set colors for the lines
-  fill(204, 101, 192, 127);
 
   initializeBoard(difficulty);
   
@@ -45,12 +51,16 @@ function draw() {
 function MiddleLine ( _board_position, _id ) {
   // TODO use map instead of id
   this.id = _id;
-  this.vertical_position = _board_position
+  // start at win condition then let initialize
+  this.vertical_position = 0;
+  this.initial_vertical_position = _board_position;
   this.is_selected = false;
+  // set the line color based on its initial distance from center
+  this.line_color = colorFromHeight( this.initial_vertical_position );
 
   // width and height are P5 canvas globals
-  this.width = width * line_width;
-  this.height = height * line_height;
+  this.line_width = width * line_width_ratio;
+  this.line_height = height * line_height_ratio;
 
 }
 
@@ -62,31 +72,36 @@ MiddleLine.prototype.display = function () {
     stroke(179, 56, 155);
   } else {
     // orange
-    strokeWeight(2);
+    strokeWeight(1);
     stroke(179, 107, 56);
   }
 
   // voodoo: width - ( gap(i+1) + bar(i) )
-  var x_val = ( ( width*line_gap )*( this.id+1 ) + ( width*line_width )*( this.id ) )
-  // voodoo: start in the middle then move in increments of the row gap times the position
-  var y_val = ( height*0.5 ) - ( ( height/row_number ) * this.vertical_position );
+  var x_val = ( ( width*line_gap_ratio )*( this.id+1 ) + ( width*line_width_ratio )*( this.id ) )
+  /* voodoo: start in the middle, move in increments of the row gap times 
+   * the position, and then add a small adjustment to center the line
+   */
+  var y_val = ( height*0.5 ) - ( ( height/row_number ) * this.vertical_position ) - (this.line_height/2);
 
   // By default, the first two parameters to rect() are the 
   // coordinates of the upper-left corner and the second pair
   // is the width and height
-  rect( x_val, y_val, this.width, this.height);
+  fill( this.line_color );
+  rect( x_val, y_val, this.line_width, this.line_height);
 }
 
-MiddleLine.prototype.moveUp = function () {
-  this.moveNeighbors( abs(this.vertical_position) );
-  this.vertical_position++;
+/**
+ * A line moves itself and its neighbors in increments of its initial distance from center
+ */
+MiddleLine.prototype.moveUpOrDown = function (  signed_step ) {
+  if ( signed_step > 0 ) {
+    this.moveNeighbors( abs(this.initial_vertical_position) );
+    this.vertical_position += abs(this.initial_vertical_position);
+  } else {
+    this.moveNeighbors( abs(this.initial_vertical_position)*(-1) );
+    this.vertical_position -= abs(this.initial_vertical_position);
+  }
 }
-
-MiddleLine.prototype.moveDown = function () {
-  this.moveNeighbors( abs(this.vertical_position)*(-1) );
-  this.vertical_position--;
-}
-
 MiddleLine.prototype.moveNeighbors = function ( amount ) {
   var left_dude = (this.id) - 1;
   var right_dude = (this.id) + 1;
@@ -100,6 +115,7 @@ MiddleLine.prototype.moveNeighbors = function ( amount ) {
 }
 
 function SelectedStateController () {
+  // internal state keeping track of selected line to prevent looping thru to find it
   this.selected_middle_line_id = 0;
 
   this.moveLeftOrRight = function ( leftOrRight ) {
@@ -131,12 +147,39 @@ function refreshMiddleLinesDisplay () {
 function initializeBoard( difficulty_value ) {
   // create the lines
   for (i=0; i<difficulty_value; i++) {
-    middle_lines.push( new MiddleLine( 0, i ));
+    middle_lines.push( new MiddleLine( randomHeight(), i ));
   }
-  // choose start
+  // set the selected line as the first one
   middle_lines[0].is_selected = true;
-  // randomize the board state
-  // TODO make randomize function
+  
+  // randomize the board state by starting from a solved condition then working backwards
+  for (i=0; i<shuffle_amount; i++) {
+   // random number between min and max:
+   // Math.floor(Math.random()*(max-min+1)+min)
+   var random_line_index = Math.floor( Math.random()*( middle_lines.length ) );
+   console.log('This line(0-(length-1)) was moved: ',random_line_index);
+   // plusOrMinus = Math.random() < 0.5 ? -1 : 1
+   var upOrDown =  Math.random() < 0.5 ? -1 : 1;
+   console.log('Up(1) or down(-1): ', upOrDown);
+   middle_lines[ random_line_index ].moveUpOrDown( upOrDown );
+  }
+}
+
+function randomHeight () {
+  // plusOrMinus = Math.random() < 0.5 ? -1 : 1
+  var rand_unsigned_height = Math.floor(Math.random()*(max_start_height-min_start_height+1)+min_start_height)
+  var plusOrMinus = Math.random() < 0.5 ? -1 : 1;
+  return rand_unsigned_height * plusOrMinus;
+}
+
+function colorFromHeight ( signed_height ) {
+  var steps = 1/(max_start_height - min_start_height);
+  var abs_height = abs(signed_height);
+  var inc = steps*(abs_height - min_start_height);
+  // TODO find a way to move the values to the top of the file
+  var start_color = color(255, 58, 51);
+  var end_color = color(255, 247, 51);
+  return lerpColor(start_color, end_color, inc);
 }
 
 function keyPressed() {
@@ -145,9 +188,9 @@ function keyPressed() {
   } else if (keyCode === RIGHT_ARROW) {
     stateContr.moveLeftOrRight(1);
   } else if (keyCode === UP_ARROW) {
-    middle_lines[ stateContr.selected_middle_line_id ].moveUp();
+    middle_lines[ stateContr.selected_middle_line_id ].moveUpOrDown( 1 );
   } else if (keyCode === DOWN_ARROW) {
-    middle_lines[ stateContr.selected_middle_line_id ].moveDown();
+    middle_lines[ stateContr.selected_middle_line_id ].moveUpOrDown ( -1 );
   }
   // refresh display after any changes
   redraw();
