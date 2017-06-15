@@ -5,6 +5,7 @@ function Branch( parent, position, direction ) {
 	this.original_direction = this.direction.copy();
 	this.count = 0;
 	this.length = branch_length;
+	this.thickness = 1;
 
 	this.reset = function () {
 		this.direction = this.original_direction.copy();
@@ -19,7 +20,8 @@ function Branch( parent, position, direction ) {
 
 	this.show = function() {
 		if ( parent != null ) {
-			stroke(255);
+			strokeWeight( Math.floor( this.thickness ) );
+			stroke(232, 236, 4);
 			line( this.parent.position.x, this.parent.position.y, this.position.x, this.position.y);
 		}
 	}

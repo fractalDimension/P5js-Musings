@@ -1,6 +1,7 @@
 function Tree() {
 	this.leaves = [];
 	this.branches = [];
+	this.initialized = false;
 
 	this.continue_grow = true;
 	this.grow_cycles_since_last_grown = 0;
@@ -9,28 +10,32 @@ function Tree() {
 		this.leaves.push(new Leaf());
 	}
 
-	var position = createVector( width / 2, height );
-	var direction = createVector( 0, -1 );
-	var root_branch = new Branch( null, position, direction);
-	this.branches.push(root_branch);
 
-	var current = root_branch;
-	var found = false;
-	while ( !found ) {
-		for (var i = 0; i < this.leaves.length; i++) {
-			var d = p5.Vector.dist( current.position, this.leaves[i].position );
-			if ( d < max_dist) {
-				found = true
+	this.initialize = function ( x, y) {
+		var position = createVector( x, y );
+		var direction = createVector( 0, -1 );
+		var root_branch = new Branch( null, position, direction);
+		this.branches.push(root_branch);
+
+		var current = root_branch;
+		var found = false;
+		while ( !found ) {
+			for (var i = 0; i < this.leaves.length; i++) {
+				var d = p5.Vector.dist( current.position, this.leaves[i].position );
+				if ( d < max_dist) {
+					found = true
+				}
 			}
-		}
-		if ( !found ) {
-			current = current.next();
-			this.branches.push(current);
+			if ( !found ) {
+				current = current.next();
+				this.branches.push(current);
+			}
 		}
 	}
 
+	
+
 	this.grow = function () {
-		console.log('growing');
 		var num_leaves_left = this.leaves.length;
 
 		for (var i = 0; i < this.leaves.length; i++) {
@@ -70,6 +75,7 @@ function Tree() {
 				branch.direction.div( branch.count );
 				this.branches.push( branch.next() );
 			}
+			branch.thickness += thickness_rate;
 			branch.reset();
 		}
 		if ( num_leaves_left == this.leaves.length ) {
